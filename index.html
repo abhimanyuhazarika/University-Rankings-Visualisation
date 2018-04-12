@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>University Rankings Visualization</title>
+  <style>
+    #container1 { border:1px dotted blue; width: 700px; height: 475px; position: relative; }
+  </style>
+</head>
+<body>
+  <h1>Times University Rankings by Country</h1>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.0/bootstrap-slider.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.0/bootstrap-slider.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/d3/3.5.3/d3.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/topojson/1.6.9/topojson.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/datamaps/0.5.8/datamaps.all.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.0/css/bootstrap-slider.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.0/css/bootstrap-slider.min.css" />
+<script>
+
+	d3.json("timesData.json", function(data1){
+	data = data1;
+	data1 = data1;
+    dataset = {};
+    var totalScoreArray = new Array();
+	data.forEach(function(element) {
+	//console.log(element.country_iso);
+	});
+	
+	var scoresByCountry = d3.nest()
+  .key(function(d) { return d.country_iso; })
+  .entries(data);
+  
+
+  
+  		var slider = new Slider('#ex1', {
+		formatter: function(value) {
+			data = data1.filter(function(d){ return d.year == value; });
+
+			generateMap(document.getElementById('rankingSelection').value);
+			document.getElementById('year').innerHTML = value;
+			if(document.getElementById('country').value)
+			generateBarChart(document.getElementById('country').value);
+			//return 'Current value: ' + value;
+		}
+	});
+	
+	});
+	
+	function generateBarChart(country){
+		document.getElementById('container2').innerHTML = "";
+		var svg = d3.select("svg"),
+		margin = {top: 20, right: 20, bottom: 30, left: 40},
+		width = +720,
+		height = +300;
+		
+		var x = d3.scale.ordinal().rangeRoundBands([0, width], .1),
+			y = d3.scale.linear().rangeRound([height, 0]);
+
+		var g = svg.append("g")
+			.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+		value= document.getElementById('rankingSelection').value;
+		//this will calculate the sum of values
+		var sum = d3.sum(data, function(d){return +d[value];});
+		data.forEach(function(d){ d[value] = d[value]});
+			
+		  data2=data.filter(function(d){ return d.country_iso == country; });;
+ 
+		  x.domain(data2.map(function(d) { return d.university_name; }));
+		  y.domain([0, 100]);
+		  
+		  var tooltip = d3.select("body").append("div").attr("class", "toolTip");
+		  
+		  g.append("g")
+			  .attr("class", "axis axis--x")
+			  .attr("transform", "translate(0," + height + ")")
+			  .call(d3.svg.axis()
+		.scale(x)
+		.orient("bottom"))
+		.selectAll("text")  
+			.style("text-anchor", "end")
+			.style("font-size", "10")
+			.attr("dx", "-.8em")
+			.attr("dy", ".15em")
+			.attr("transform", "rotate(-65)");
+
+		  g.append("g")
+			  .attr("class", "axis axis--y")
+			  .call(d3.svg.axis()
+		.scale(y)
+		.orient("left").ticks(10))
+			.append("text")
+			  .attr("transform", "rotate(-90)")
+			  .attr("y", 6)
+			  .attr("dy", "-2.40em")
+			  .attr("text-anchor", "end")
+			  .text(value);
+
+		  g.selectAll(".bar")
+			.data(data2)
+			.enter().append("rect")
+			  .attr("class", "bar")
+			  .attr("x", function(d) { return x(d.university_name); })
+			  .attr("y", function(d) { return y(d[value]); })
+			  .attr("width", x.rangeBand())
+			  .attr("height", function(d) { return height - y(d[value]); })
+			  .on("mousemove", function(d){
+				tooltip
+				  .style("left", d3.event.pageX - 50 + "px")
+				  .style("top", d3.event.pageY - 70 + "px")
+				  .style("display", "inline-block")
+				  .html((d.university_name) + "<br>" + value + ":" +(d[value]));
+				})
+			  .on("mouseout", function(d){ tooltip.style("display", "none");});;
+			  
+	}
+
+	
+	
+		
+	function generateMap(value){
+		document.getElementById('container1').innerHTML = "";
+		document.getElementById('container2').innerHTML = "";
+		document.getElementById('rankingSelection').value = value;
+		var scoresAvg = getAvgScores(value);
+		var scoresAvgNoNull = removeNullData(scoresAvg);
+		getMinAndMaxValues(scoresAvgNoNull);
+		createMap(scoresAvg);
+	}
+	
+	function getAvgScores(value) {
+	var avgScores = d3.nest()
+	  .key(function(d) { return d.country_iso; })
+	  .rollup(function(v) { return d3.mean(v, function(d) { return  d[value]; }); })
+	  .entries(data); 
+	  return avgScores;
+	}
+	
+	function removeNullData(scores1) {
+    	var i=0;
+		scores1.forEach(function(item){
+		if(!item.values || item.values=='-')
+		{
+		  delete scores1[i];
+		}
+		  i++;
+		}); 
+
+		scores1 = scores1.filter(function(n){ return n != undefined }); 	
+		return scores1;
+	}
+	
+	function getMinAndMaxValues(data1) {
+	var onlyValues = data1.map(function(obj){ 
+				if (obj.values)
+				{
+					return obj.values;
+				}
+				});
+	minValue = Math.min.apply(null, onlyValues),
+		maxValue = Math.max.apply(null, onlyValues);
+	}
+	
+	function createMap(scoresAvg){
+		var paletteScale = d3.scale.linear()
+				.domain([minValue,maxValue])
+				.range(["#EFEFFF","#02386F"]);
+		scoresAvg.forEach(function(item){ //
+			var iso = item.key,
+					value = item.values;
+				dataset[iso] = { numberOfThings: value, fillColor: paletteScale(value) };
+		});
+
+		// render map
+		new Datamap({
+			element: document.getElementById('container1'),
+			projection: 'mercator', 
+			fills: { defaultFill: 'white' },
+			data: dataset,
+			geographyConfig: {
+				borderColor: '#DEDEDE',
+				highlightBorderWidth: 2,
+				highlightFillColor: function(geo) {
+					return geo['fillColor'] || '#F5F5F5';
+				},
+				highlightBorderColor: '#B7B7B7',
+				popupTemplate: function(geo, data) {
+					// don't show tooltip if country don't present in dataset
+					if (!data) { return ; }
+					// tooltip content
+					return ['<div class="hoverinfo">',
+						'<strong>', geo.properties.name, '</strong>',
+						'<br>Avg.'+ document.getElementById('rankingSelection').value+': <strong>', data.numberOfThings, '</strong>',
+						'</div>'].join('');
+				}
+			},
+			done: function(datamap) {
+				datamap.svg.selectAll('.datamaps-subunit').on('click', function(geography) {
+				generateBarChart(geography.id);
+				document.getElementById('country').value = geography.id;
+        });
+    }
+		});
+	}
+	
+</script>
+ <style>
+/* The container */
+.container {
+    display: block;
+    position: relative;
+    padding-left: 35px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    font-size: 15px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Hide the browser's default checkbox */
+.container input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* Create a custom checkbox */
+.checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 25px;
+    width: 25px;
+    background-color: #eee;
+}
+
+/* On mouse-over, add a grey background color */
+.container:hover input ~ .checkmark {
+    background-color: #ccc;
+}
+
+/* When the checkbox is checked, add a blue background */
+.container input:checked ~ .checkmark {
+    background-color: #2196F3;
+}
+
+/* Create the checkmark/indicator (hidden when not checked) */
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+/* Show the checkmark when checked */
+.container input:checked ~ .checkmark:after {
+    display: block;
+}
+
+/* Style the checkmark/indicator */
+.container .checkmark:after {
+    left: 9px;
+    top: 5px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 3px 3px 0;
+    -webkit-transform: rotate(45deg);
+    -ms-transform: rotate(45deg);
+    transform: rotate(45deg);
+}
+#ex1Slider .slider-selection {
+	background: #BABABA;
+}
+
+.bar {
+  fill: steelblue;
+}
+
+.bar:hover {
+  fill: brown;
+}
+
+.axis--x path {
+  display: none;
+}
+
+#wrapper {
+    margin-left: 0px;
+	margin-right: 0px;
+	margin-bottom: 10px;
+    padding: 5px;
+    overflow: auto;
+}
+
+.toolTip {
+  position: absolute;
+  display: none;
+  min-width: 80px;
+  height: auto;
+  background: none repeat scroll 0 0 #ffffff;
+  border: 1px solid #6F257F;
+  padding: 14px;
+  text-align: center;
+}
+</style>
+<div class = "container" ><input id="ex1" data-slider-id='ex1Slider' type="text" data-slider-min="2011" data-slider-max="2016" data-slider-step="1" data-slider-value="2011" /></div>
+<form action="">
+  <div id="year" class="container" ></div>
+  <input type="radio" name="rankingBy" onclick='generateMap("income");'> Income
+  <input type="radio" name="rankingBy" onclick='generateMap("international");'> International
+  <input type="radio" name="rankingBy" onclick='generateMap("teaching");'> Teaching
+  <input type="radio" name="rankingBy" onclick='generateMap("research");'> Research
+  <input type="radio" name="rankingBy" onclick='generateMap("citations");'> Citations
+</form>
+<div id="wrapper">
+  <svg id="container2" width="750" height="900" style="float:right;" ></svg>
+  <div id="container1" style="float:left"></div>
+  <input id="rankingSelection" type="hidden"/>
+  <input id="country" type="hidden"/>
+</div>
+  
+</body>
+</html>
